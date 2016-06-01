@@ -1,0 +1,25 @@
+OS: centos
+ImageId: ami-02dc4c6b
+InstanceType: m3.large
+KeyPair: cbmi_it_dev
+IPAddress: null
+ChefRole: null
+AnsiblePlaybook: rc-pcori-pmsdn/etl.yml
+AnsibleGroup: etl
+environment: develop
+InstanceName: etldevebola
+StackName: etldevebola
+cloudtype: aws
+SecGroups:
+    - transmart_ebola_dev
+AppServerAvailabilityZones:
+    # us-east-1b and us-east-1c smell funny, skip those...
+    - us-east-1a
+    - us-east-1c
+    - us-east-1d
+LoadBalancer: false
+AutoScalingGroupMaxSize: 1
+AutoScalingGroupMinSize: 1
+Tags:
+ ansiblegroup: etl
+ environment: develop

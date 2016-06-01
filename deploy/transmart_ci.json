@@ -1,0 +1,219 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Auto Generated -- transmart-dev",
+  "Parameters": {
+    "SecretStashUsername": {
+      "Type": "String",
+      "Description": "A username for Secret Stash"
+    },
+    "SecretStashPassword": {
+      "NoEcho": "true",
+      "Type": "String",
+      "Description": "A password for Secret Stash"
+    },
+    "SecretStashURL": {
+      "Default": "ec2-54-164-123-229.compute-1.amazonaws.com",
+      "Type": "String",
+      "Description": "A url for Secret Stash"
+    },
+    "SecretStashGroups": {
+      "Default": "build",
+      "Type": "String",
+      "Description": "Groups for secretstash"
+    }
+  },
+  "Resources": {
+    "SSHSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "SecurityGroupIngress": {
+          "ToPort": "22",
+          "IpProtocol": "tcp",
+          "FromPort": "22",
+          "CidrIp": "0.0.0.0/0"
+        },
+        "GroupDescription": "allows inbound SSH from all"
+      }
+    },
+    "HTTPSSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "SecurityGroupIngress": {
+          "ToPort": "443",
+          "IpProtocol": "tcp",
+          "FromPort": "443",
+          "CidrIp": "0.0.0.0/0"
+        },
+        "GroupDescription": "allows inbound HTTPS from all"
+      }
+    },
+    "TheComputeLaunch": {
+      "Type": "AWS::EC2::Instance",
+      "Properties": {
+        "UserData": {
+          "Fn::Base64": {
+            "Fn::Join": [
+              "",
+              [
+                "#!/bin/bash\n",
+                "touch /var/log/user-data.log\n",
+                "chmod 0640 /var/log/user-data.log\n",
+                "chown root:syslog /var/log/user-data.log\n",
+                "exec > /var/log/user-data.log 2>&1\n",
+                "echo BEGIN\n",
+                "date '+%Y-%m-%d %H:%M:%S'\n",
+                "IFS=','\n",
+                "USERGROUPS=\"",
+                {
+                  "Ref": "SecretStashGroups"
+                },
+                "\"\n",
+                "set -e -x\n",
+                "cd ~\n",
+                "yum -y install wget\n",
+                "rm -rf epel-release-6*.rpm\n",
+                "wget http://dl.fedoraproject.org/pub/epel/6/x86_64/epel-release-6-8.noarch.rpm\n",
+                "wget http://pkgs.repoforge.org/rpmforge-release/rpmforge-release-0.5.3-1.el6.rf.x86_64.rpm\nrpm -Uvh --replacepkgs epel-release-6*.rpm\n",
+                "rpm -Uvh --replacepkgs rpmforge*.rpm\n",
+                "yum -y update\n",
+                "sh -c 'wget -qO- http://people.redhat.com/bkabrda/scl_python27.repo >> /etc/yum.repos.d/scl.repo'\n",
+                "yum install -y python27\n",
+                "yum install -y curl git ansible python-pip python-setuptools autoconf gcc automake python-devel libyaml-devel\n",
+                "cd ~\n",
+                "PATH=$PATH:/sbin LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/rh/python27/root/usr/lib64 /opt/rh/python27/root/usr/bin/easy_install jinja2\n",
+                "PATH=$PATH:/sbin LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/rh/python27/root/usr/lib64 /opt/rh/python27/root/usr/bin/easy_install pyyaml\n",
+                "PATH=$PATH:/sbin LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/rh/python27/root/usr/lib64 /opt/rh/python27/root/usr/bin/easy_install paramiko\n",
+                "PATH=$PATH:/sbin LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/rh/python27/root/usr/lib64 /opt/rh/python27/root/usr/bin/easy_install pip\n",
+                "PATH=$PATH:/sbin LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/rh/python27/root/usr/lib64 /opt/rh/python27/root/usr/bin/easy_install virtualenv\n",
+                "PATH=$PATH:/sbin LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/rh/python27/root/usr/lib64 /opt/rh/python27/root/usr/bin/pip install awscli\n",
+                "PATH=$PATH:/sbin LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/rh/python27/root/usr/lib64 /opt/rh/python27/root/usr/bin/pip install httplib2\n",
+                "pip install httplib2\n",
+                "rm -rf ansible\n",
+                "git clone git://github.com/ansible/ansible.git --recursive\n",
+                "cd ./ansible\n",
+                "PATH=$PATH:/sbin LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/rh/python27/root/usr/lib64 /opt/rh/python27/root/usr/bin/python setup.py build\n",
+                "PATH=$PATH:/sbin LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/rh/python27/root/usr/lib64 /opt/rh/python27/root/usr/bin/python setup.py install\n",
+                "cd ~\n",
+                "wget http://stedolan.github.io/jq/download/linux64/jq\n",
+                "mv jq /usr/bin/jq\n",
+                "chmod +x /usr/bin/jq\n",
+                "instanceid=`curl http://169.254.169.254/latest/meta-data/instance-id`\n",
+                "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz\n",
+                "cfn-init --region ",
+                {
+                  "Ref": "AWS::Region"
+                },
+                "    -s ",
+                {
+                  "Ref": "AWS::StackName"
+                },
+                " -r TheComputeLaunch\n",
+                "curl -k -X POST -H \"Accept: application/json;indent=4\" -H \"Content-Type:application/json\" -u \"",
+                {
+                  "Ref": "SecretStashUsername"
+                },
+                ":",
+                {
+                  "Ref": "SecretStashPassword"
+                },
+                "\" \"https://",
+                {
+                  "Ref": "SecretStashURL"
+                },
+                "/secrets/api/host/\" -d '{\"name\":\"'\"$instanceid\"'\"}' | jq -r .apikey.key > /root/secretstash.txt\n",
+                "for val in $USERGROUPS; do curl -k -X PUT -H \"Accept: application/json;indent=4\" -H \"Content-Type:application/json\" -u \"",
+                {
+                  "Ref": "SecretStashUsername"
+                },
+                ":",
+                {
+                  "Ref": "SecretStashPassword"
+                },
+                "\" -d '{\"groups\":[\"'\"$val\"'\"],\"action\":\"add\"}' \"https://",
+                {
+                  "Ref": "SecretStashURL"
+                },
+                "/secrets/usergroup/$instanceid/\"; done\nTOKEN=`cat /root/secretstash.txt`\n",
+                "curl -k -X GET -H \"Authorization: Token $TOKEN\" -H \"Accept: application/json;indent=4\"  \"https://",
+                {
+                  "Ref": "SecretStashURL"
+                },
+                "/secrets/api/secret/10/\" | jq -r .content > /root/github.txt \nGITHUB=`cat /root/github.txt`\n",
+                "git clone https://dbmibot:$GITHUB@github.com/hms-dbmi/chef.git --branch=develop /var/chef-repo \n",
+                "PATH=$PATH:/sbin LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/rh/python27/root/usr/lib64 /opt/rh/python27/root/usr/bin/ansible-galaxy install geerlingguy.java\n",
+                "cd ~\n",
+                "wget https://raw.githubusercontent.com/ansible/ansible/devel/plugins/inventory/ec2.py\n",
+                "wget https://raw.githubusercontent.com/ansible/ansible/devel/plugins/inventory/ec2.ini\n",
+                "chmod +x ec2.py\n",
+                "cd /var/chef-repo/ansible\n",
+                "PATH=$PATH:/sbin LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/rh/python27/root/usr/lib64 /opt/rh/python27/root/usr/bin/ansible-playbook -i /etc/ansible/ansible.local rc-pcori-pmsdn/transmart.yml --extra-vars '{\"cloud\":\"aws\",\"secretstash_url\":\"",
+                {
+                  "Ref": "SecretStashURL"
+                },
+                "\"}'\n",
+                "exit 0\n"
+              ]
+            ]
+          }
+        },
+        "Tags": [
+          {
+            "Value": "develop",
+            "Key": "environment"
+          },
+          {
+            "Value": "transmart",
+            "Key": "ansiblegroup"
+          },
+          {
+            "Value": "transmart-dev",
+            "Key": "Name"
+          }
+        ],
+        "ImageId": "ami-02dc4c6b",
+        "KeyName": "dbmi_development",
+        "SecurityGroups": [
+          {
+            "Ref": "HTTPSSecurityGroup"
+          },
+          {
+            "Ref": "SSHSecurityGroup"
+          },
+          "transmartdev"
+        ],
+        "InstanceType": "t2.medium"
+      },
+      "Metadata": {
+        "AWS::CloudFormation::Init": {
+          "config": {
+            "files": {
+              "/etc/ansible/ansible.local": {
+                "content": {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "transmart-dev ansible_connection=local\n",
+                      "\n",
+                      "[transmart]\n",
+                      "transmart-dev\n",
+                      "\n"
+                    ]
+                  ]
+                },
+                "owner": "root",
+                "group": "root",
+                "mode": "000600"
+              }
+            },
+            "commands": {},
+            "users": {},
+            "sources": {},
+            "groups": {},
+            "services": {},
+            "packages": {}
+          }
+        }
+      }
+    }
+  }
+}
